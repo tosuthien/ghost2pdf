@@ -1,14 +1,21 @@
 var express = require('express');
 var router = express.Router();
 const fs = require('fs');
-const tmpl = fs.readFileSync(require.resolve('./card.html'), 'utf8');
 const pdf = require('html-pdf');
 const axios = require('axios');
 const { Readable } = require('stream')
 
-const GHOST_URL = 'https://tosu-thien.com'
-const GHOST_API_KEY = '22f02f889379cdfd103fdd5a29'
+const GHOST_URL = process.env.GHOST_URL
+const GHOST_API_KEY = process.env.GHOST_API_KEY
 
+const defaultOption = {
+  border: {
+      top: "10mm",
+      right: "5mm",
+      bottom: "10mm",
+      left: "7mm"
+    },
+}
 
 /* GET home page. */
 router.get('/books', (req, res, next) => {
@@ -26,13 +33,17 @@ router.get('/books', (req, res, next) => {
   });
 });
 
+
 router.get('/books/:postId', (req, res, next) => {
   const {postId} = req.params
-  const {w,h} = req.query;
-  console.log(`w = ${w}, h = ${h}`)
+  const {w = 450,h = 800} = req.query;
+  const options = {
+    ...defaultOption,
+    width: `${w}mm`, height: `${h}mm`
+  }
   axios.get(`${GHOST_URL}/ghost/api/v3/content/posts/${postId}?key=${GHOST_API_KEY}`)
   .then( (response) => {
-    pdf.create(response.data.posts[0]['html'], {width: `${w}mm`, height: `${h}mm`}).toStream((err, stream) => {
+    pdf.create(response.data.posts[0]['html'], options).toStream((err, stream) => {
       if (err) return res.end(err.stack)
       res.setHeader('Content-type', 'application/pdf')
       stream.pipe(res)
@@ -41,7 +52,7 @@ router.get('/books/:postId', (req, res, next) => {
   })
   .catch( (error) => {
     // handle error
-    console.log(error);
+    res.json({error: error.message});
   })
   .then( () => {
     // always executed
